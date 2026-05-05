@@ -7,18 +7,29 @@ const apiClient = axios.create({
   },
 });
 
-// Intercepteur de réponse : intercepte toutes les réponses avant ton code
+// Intercepteur de requête : attache le token JWT à chaque appel
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// Intercepteur de réponse : gestion centralisée des erreurs
 apiClient.interceptors.response.use(
-  // Cas succès : on laisse passer la réponse sans la modifier
   (response) => response,
 
-  // Cas erreur : on centralise la gestion ici
   (error: AxiosError) => {
     const status = error.response?.status;
 
     if (status === 401) {
-      // Non authentifié — à terme, rediriger vers la page de connexion
-      console.error("Non authentifié. Veuillez vous connecter.");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
     } else if (status === 403) {
       console.error("Accès refusé.");
     } else if (status === 404) {
@@ -26,11 +37,9 @@ apiClient.interceptors.response.use(
     } else if (status && status >= 500) {
       console.error("Erreur serveur. Veuillez réessayer plus tard.");
     } else if (!error.response) {
-      // Pas de réponse = problème réseau ou serveur injoignable
       console.error("Impossible de contacter le serveur.");
     }
 
-    // On rejette l'erreur pour que le code appelant puisse aussi la gérer si besoin
     return Promise.reject(error);
   }
 );
